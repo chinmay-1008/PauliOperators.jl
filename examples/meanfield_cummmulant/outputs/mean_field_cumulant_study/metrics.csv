@@ -1,0 +1,10 @@
+scenario,metric,value
+"product_reference","weight_max_error",0.19048904209865547
+"product_reference","mean_field_max_error",0.00035656886666990406
+"product_reference","mean_field_final_error",0.00035656886666990406
+"product_reference","mean_field_final_terms",357.0
+"bell_reference","kappa_Z1_Z2",0.9999999999999998
+"bell_reference","single_site_mf_ZZ_terms_at_k1",0.0
+"multireference_heisenberg","final_abs_error",0.6510678679932294
+"multireference_heisenberg","pair_signal_error_correlation",0.8934133666460278
+"multireference_heisenberg","triple_signal_error_correlation",NaN

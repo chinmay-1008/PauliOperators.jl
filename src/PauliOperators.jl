@@ -24,12 +24,11 @@ module PauliOperators
     include("commutator.jl")
     include("clip.jl")
     include("truncation.jl")
+    include("mean_field.jl")
     include("evolve.jl")
     include("decompose.jl")
     include("gates.jl")
     include("analysis.jl")
-    include("channels.jl")
-    include("transformations.jl")
 
     const ⊗ = otimes
     const ⊕ = osum
@@ -57,8 +56,7 @@ module PauliOperators
     export commute
 
     export evolve, evolve!
-    export weight, coeff_clip!, weight_clip!, weight_damped_clip!
-    export x_weight, x_weight_clip!, x_weight_damped_clip!
+    export weight, coeff_clip!, weight_clip!
     export majorana_weight, majorana_weight_clip!
     export stochastic_clip!
 
@@ -69,12 +67,13 @@ module PauliOperators
     # Truncation strategy system
     export TruncationStrategy, CorrectionAccumulator
     export NoTruncation, CoeffTruncation, WeightTruncation
-    export XWeightTruncation, XWeightDampedTruncation
-    export MajoranaWeightTruncation, WeightDampedTruncation, CompositeTruncation
+    export MajoranaWeightTruncation, CompositeTruncation
     export StochasticCoeffTruncation, StochasticSamplingTruncation
     export AdaptiveTruncation
+    export MeanFieldTruncation
     export NoCorrection, EnergyCorrection, EnergyVarianceCorrection
     export truncate!
+    export mean_field_factorize, mean_field_factorize!
 
     # Decomposition
     export trotterize, qdrift
@@ -89,17 +88,4 @@ module PauliOperators
     export get_weight_counts, get_weight_probs
     export get_majorana_weight_counts, get_majorana_weight_probs
     export find_top_k, largest, largest_diag
-
-    # Channels
-    export AbstractQuantumChannel
-    export pauli_channel,           pauli_channel!
-    export depolarizing_channel,    depolarizing_channel!
-    export dephasing_channel,       dephasing_channel!
-    export phase_flip_channel,      phase_flip_channel!
-    export bit_flip_channel,        bit_flip_channel!
-    export bit_phase_flip_channel,  bit_phase_flip_channel!
-    export depolarizing_p_for_weight_decay
-
-    # Transformations
-    export jordan_wigner, boson_to_paulis
 end

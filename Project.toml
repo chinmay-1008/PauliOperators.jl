@@ -1,18 +1,24 @@
 name = "PauliOperators"
 uuid = "be646426-f34c-4536-b1d4-a45a9633e6db"
+version = "3.0.0"
 authors = ["Nick Mayhall"]
-version = "3.0.1"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+KrylovKit = "0b1a1467-8014-51b9-945f-bf0ae24f4b77"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 BenchmarkTools = "1.6.0"
+FFTW = "1.10.0"
+KrylovKit = "0.10.3"
 LinearAlgebra = "1.11.0"
+Plots = "1.41.6"
 Printf = "1.11.0"
 Random = "1.11.0"
 StaticArrays = "1.9.15"

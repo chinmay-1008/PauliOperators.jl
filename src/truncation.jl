@@ -39,15 +39,6 @@ struct WeightTruncation <: TruncationStrategy
 end
 
 """
-    XWeightTruncation(max_weight::Int)
-
-Remove Pauli terms with X-weight (number of X/Y factors) > `max_weight`.
-"""
-struct XWeightTruncation <: TruncationStrategy
-    max_weight::Int
-end
-
-"""
     MajoranaWeightTruncation(max_weight::Int)
 
 Remove Pauli terms with Majorana weight > `max_weight`.
@@ -55,34 +46,6 @@ Remove Pauli terms with Majorana weight > `max_weight`.
 struct MajoranaWeightTruncation <: TruncationStrategy
     max_weight::Int
 end
-
-"""
-    WeightDampedTruncation(alpha::Float64, thresh::Float64)
-
-Remove Pauli terms with |coefficient|·exp(-alpha·weight) <= `thresh`,
-i.e. a coefficient threshold that grows exponentially with Pauli weight.
-`alpha = 0` reduces to `CoeffTruncation(thresh)`; large `alpha` approaches
-a hard weight cutoff.
-"""
-struct WeightDampedTruncation <: TruncationStrategy
-    alpha::Float64
-    thresh::Float64
-end
-WeightDampedTruncation(alpha::Real) = WeightDampedTruncation(alpha, 1e-6)
-
-"""
-    XWeightDampedTruncation(alpha::Float64, thresh::Float64)
-
-Remove Pauli terms with |coefficient|·exp(-alpha·x_weight) <= `thresh`,
-i.e. a coefficient threshold that grows exponentially with X-weight (the
-number of X/Y factors). `alpha = 0` reduces to `CoeffTruncation(thresh)`;
-large `alpha` approaches a hard X-weight cutoff.
-"""
-struct XWeightDampedTruncation <: TruncationStrategy
-    alpha::Float64
-    thresh::Float64
-end
-XWeightDampedTruncation(alpha::Real) = XWeightDampedTruncation(alpha, 1e-6)
 
 """
     StochasticCoeffTruncation(epsilon::Float64; rng=Random.default_rng())
@@ -127,19 +90,39 @@ AdaptiveTruncation(; max_terms::Int=10000, min_thresh::Float64=1e-12) = Adaptive
     CompositeTruncation(strategies...)
 
 Apply multiple truncation strategies in sequence.
-
-Strategies are stored as a typed `Tuple` rather than `Vector{TruncationStrategy}`,
-so the per-element dispatches inside `_apply!` resolve at compile time and the
-inner `coeff_clip!` / `weight_clip!` calls inline. Constructing via the variadic
-form (`CompositeTruncation(CoeffTruncation(1e-4), WeightTruncation(5))`) is
-the supported call style; an `AbstractVector` constructor is also provided
-for convenience but converts to a tuple internally.
 """
-struct CompositeTruncation{S<:Tuple} <: TruncationStrategy
-    strategies::S
+struct CompositeTruncation <: TruncationStrategy
+    strategies::Vector{TruncationStrategy}
 end
-CompositeTruncation(s::TruncationStrategy...) = CompositeTruncation(s)
-CompositeTruncation(v::AbstractVector{<:TruncationStrategy}) = CompositeTruncation(Tuple(v))
+CompositeTruncation(s::TruncationStrategy...) = CompositeTruncation(collect(TruncationStrategy, s))
+
+"""
+    MeanFieldTruncation(max_weight::Int, reference::Union{Ket{N},KetSum{N}})
+
+Replace each Pauli term with weight > `max_weight` by its order-`max_weight`
+mean-field factorization around `reference`.
+
+Unlike `WeightTruncation`, which discards high-weight terms, this strategy
+expands each high-weight string in single-site fluctuations
+`δP_i = P_i − ⟨P_i⟩ I` and keeps the lower-weight pieces. For computational-basis
+`Ket` references, the optimized factorization preserves
+`⟨reference|O|reference⟩` at every truncation order. For `KetSum` references,
+the strategy uses local single-site expectations and is a mean-field
+approximation for entangled states.
+"""
+struct MeanFieldTruncation{N,R} <: TruncationStrategy
+    max_weight::Int
+    reference::R
+end
+
+MeanFieldTruncation(max_weight::Int, reference::Ket{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+MeanFieldTruncation(max_weight::Int, reference::KetSum{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+MeanFieldTruncation{N}(max_weight::Int, reference::Ket{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+MeanFieldTruncation{N}(max_weight::Int, reference::KetSum{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
 
 
 # ============================================================
@@ -158,20 +141,8 @@ function _apply!(O::PauliSum{N}, s::WeightTruncation) where N
     return weight_clip!(O, s.max_weight)
 end
 
-function _apply!(O::PauliSum{N}, s::XWeightTruncation) where N
-    return x_weight_clip!(O, s.max_weight)
-end
-
 function _apply!(O::PauliSum{N}, s::MajoranaWeightTruncation) where N
     return majorana_weight_clip!(O, s.max_weight)
-end
-
-function _apply!(O::PauliSum{N}, s::WeightDampedTruncation) where N
-    return weight_damped_clip!(O, s.alpha, s.thresh)
-end
-
-function _apply!(O::PauliSum{N}, s::XWeightDampedTruncation) where N
-    return x_weight_damped_clip!(O, s.alpha, s.thresh)
 end
 
 function _apply!(O::PauliSum{N}, s::StochasticCoeffTruncation) where N
@@ -215,14 +186,15 @@ function _apply!(O::PauliSum{N}, s::AdaptiveTruncation) where N
     return O
 end
 
-# Recursive tail-pop iteration over the heterogeneous tuple of strategies so
-# each `_apply!(O, strategy)` resolves at compile time and inlines.
-@inline _apply_tup!(O, ::Tuple{}) = O
-@inline _apply_tup!(O, s::Tuple)  = (_apply!(O, first(s)); _apply_tup!(O, Base.tail(s)))
-
 function _apply!(O::PauliSum{N}, s::CompositeTruncation) where N
-    _apply_tup!(O, s.strategies)
+    for strategy in s.strategies
+        _apply!(O, strategy)
+    end
     return O
+end
+
+function _apply!(O::PauliSum{N,T}, s::MeanFieldTruncation{N}) where {N,T}
+    return mean_field_factorize!(O, s.reference, s.max_weight)
 end
 
 
