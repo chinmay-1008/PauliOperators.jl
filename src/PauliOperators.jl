@@ -80,6 +80,7 @@ module PauliOperators
     export StochasticCoeffTruncation, StochasticSamplingTruncation
     export AdaptiveTruncation
     export NoCorrection, EnergyCorrection, EnergyVarianceCorrection
+    export VarianceTruncationRecord
     export truncate!
 
     # Decomposition

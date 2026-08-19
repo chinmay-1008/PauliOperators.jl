@@ -322,6 +322,60 @@ using Random
         @test corr.accumulated_variance ≈ v_after - v_before
     end
 
+    @testset "Variance-component recording" begin
+        N = 2
+        ψ = Ket(N, 0)
+        ps = PauliSum(N, ComplexF64)
+        ps[PauliBasis("II")] = 1.0 + 0im
+        ps[PauliBasis("XI")] = 0.4 + 0im
+        ps[PauliBasis("XZ")] = 0.05 + 0im  # same flip sector as XI
+        ps[PauliBasis("IX")] = 0.03 + 0im  # orthogonal flip sector
+        ps[PauliBasis("IZ")] = 0.04 + 0im  # discarded nonzero expectation
+
+        v_before = real(variance(ps, ψ))
+        corr = EnergyVarianceCorrection(ψ; record_components=true)
+        truncate!(ps, CoeffTruncation(0.1), corr)
+        v_after = real(variance(ps, ψ))
+
+        @test length(corr.records) == 1
+        record = only(corr.records)
+        @test record.var_B ≈ 0.05^2 + 0.03^2
+        @test record.cov_A_B ≈ 0.4 * 0.05
+        @test record.two_cov_A_B ≈ 2 * record.cov_A_B
+        @test record.delta_variance ≈
+              -(record.var_B + record.two_cov_A_B)
+        @test record.delta_variance ≈ v_after - v_before
+        @test record.delta_energy ≈ -0.04
+        @test corr.accumulated_variance ≈ v_after - v_before
+
+        # The ordered SPV run sink and Dict-backed PauliSum route must expose
+        # the same decomposition, not merely the same total correction.
+        ps0 = PauliSum(N, ComplexF64)
+        ps0[PauliBasis("II")] = 1.0 + 0im
+        ps0[PauliBasis("XI")] = 0.4 + 0im
+        ps0[PauliBasis("XZ")] = 0.05 + 0im
+        ps0[PauliBasis("IX")] = 0.03 + 0im
+        ps0[PauliBasis("IZ")] = 0.04 + 0im
+        c_dict = EnergyVarianceCorrection(ψ; record_components=true)
+        c_spv = EnergyVarianceCorrection(ψ; record_components=true)
+        ps_dict = deepcopy(ps0)
+        ps_spv = SparsePauliVector(ps0)
+        truncate!(ps_dict, CoeffTruncation(0.1), c_dict)
+        truncate!(ps_spv, CoeffTruncation(0.1), c_spv)
+        rd = only(c_dict.records)
+        rs = only(c_spv.records)
+        @test rd.var_B ≈ rs.var_B
+        @test rd.cov_A_B ≈ rs.cov_A_B
+        @test rd.delta_variance ≈ rs.delta_variance
+        @test rd.delta_energy ≈ rs.delta_energy
+
+        c_default = EnergyVarianceCorrection(ψ)
+        truncate!(deepcopy(ps0), CoeffTruncation(0.1), c_default)
+        @test isempty(c_default.records)
+        @test c_default.accumulated_energy ≈ c_dict.accumulated_energy
+        @test c_default.accumulated_variance ≈ c_dict.accumulated_variance
+    end
+
     @testset "Multiple truncations accumulate" begin
         N = 4
         ψ = Ket(N, 0)

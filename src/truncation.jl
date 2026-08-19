@@ -269,13 +269,52 @@ EnergyCorrection(ψ::Ket{N}) where N = EnergyCorrection{N}(ψ, 0.0)
     EnergyVarianceCorrection(ψ::Ket{N})
 
 Track accumulated changes in both ⟨ψ|O|ψ⟩ and Var(O,ψ) due to truncation.
+Pass `record_components=true` to retain the exact discarded-variance and
+kept/discarded-covariance decomposition for each pure-drop truncation.
 """
+struct VarianceTruncationRecord
+    var_B::Float64
+    cov_A_B::Float64
+    two_cov_A_B::Float64
+    delta_variance::Float64
+    delta_energy::Float64
+end
+
 mutable struct EnergyVarianceCorrection{N} <: CorrectionAccumulator
     ψ::Ket{N}
     accumulated_energy::Float64
     accumulated_variance::Float64
+    record_components::Bool
+    records::Vector{VarianceTruncationRecord}
 end
-EnergyVarianceCorrection(ψ::Ket{N}) where N = EnergyVarianceCorrection{N}(ψ, 0.0, 0.0)
+EnergyVarianceCorrection(ψ::Ket{N}; record_components::Bool=false) where N =
+    EnergyVarianceCorrection{N}(
+        ψ, 0.0, 0.0, record_components, VarianceTruncationRecord[])
+
+function _accumulate_variance_delta!(corr::EnergyVarianceCorrection,
+                                     bb, ab, eA, eB)
+    delta_energy = -real(eB)
+    if corr.record_components
+        var_B = real(bb - eB * eB)
+        cov_A_B = real(ab - eA * eB)
+        two_cov_A_B = 2 * cov_A_B
+        delta_variance = -(var_B + two_cov_A_B)
+        push!(corr.records, VarianceTruncationRecord(
+            var_B,
+            cov_A_B,
+            two_cov_A_B,
+            delta_variance,
+            delta_energy,
+        ))
+    else
+        # Preserve the production arithmetic exactly when recording is off.
+        delta_variance = -(bb + 2 * real(ab)) +
+                         real(2 * eA * eB + eB * eB)
+    end
+    corr.accumulated_energy += delta_energy
+    corr.accumulated_variance += delta_variance
+    return nothing
+end
 
 
 # ============================================================
@@ -506,8 +545,7 @@ function _finalize_delta!(corr::EnergyVarianceCorrection, Δ::XRunDelta, O)
     eB = Δ.eB
     # identical formula to the TruncationDelta route below — only the
     # gathering of bb/ab/eA/eB differs (single ordered pass vs dict + sweep)
-    corr.accumulated_energy   += -real(eB)
-    corr.accumulated_variance += -(Δ.bb + 2 * real(Δ.ab)) + real(2 * eA * eB + eB * eB)
+    _accumulate_variance_delta!(corr, Δ.bb, Δ.ab, eA, eB)
     return nothing
 end
 
@@ -517,7 +555,12 @@ function _finalize_delta!(corr::EnergyCorrection, Δ::TruncationDelta, O)
 end
 
 function _finalize_delta!(corr::EnergyVarianceCorrection, Δ::TruncationDelta, O)
-    isempty(Δ.b) && return nothing
+    if isempty(Δ.b)
+        corr.record_components &&
+            _accumulate_variance_delta!(corr, 0.0, 0.0 + 0.0im,
+                                        0.0 + 0.0im, 0.0 + 0.0im)
+        return nothing
+    end
     eB = get(Δ.b, Δ.ψv, zero(ComplexF64))       # ⟨ψ|B|ψ⟩ (complex-safe)
     bb = 0.0                                    # ⟨Bψ|Bψ⟩
     for amp in values(Δ.b)
@@ -536,8 +579,7 @@ function _finalize_delta!(corr::EnergyVarianceCorrection, Δ::TruncationDelta, O
     eA = aψ[]                                   # ⟨ψ|A|ψ⟩
     # matches variance() = real(‖Oψ‖² − ⟨ψ|O|ψ⟩²) exactly:
     #   Δ‖Oψ‖² = −(bb + 2Re⟨a|b⟩),  Δ⟨O⟩² = −(2·eA·eB + eB²)
-    corr.accumulated_energy   += -real(eB)
-    corr.accumulated_variance += -(bb + 2 * real(ab)) + real(2 * eA * eB + eB * eB)
+    _accumulate_variance_delta!(corr, bb, ab, eA, eB)
     return nothing
 end
 
@@ -569,6 +611,9 @@ function _accumulate!(corr::EnergyCorrection, before, after)
 end
 
 function _accumulate!(corr::EnergyVarianceCorrection, before, after)
+    corr.record_components && throw(ArgumentError(
+        "variance-component recording requires a pure-drop, compilable " *
+        "truncation strategy"))
     corr.accumulated_energy += after.energy - before.energy
     corr.accumulated_variance += after.variance - before.variance
 end
@@ -593,6 +638,12 @@ implementing `_apply!(O, s)`. New correction types are defined by subtyping
 """
 function truncate!(O::AnyPauliSum, strategy::TruncationStrategy,
                    corr::CorrectionAccumulator=NoCorrection())
+    if corr isa EnergyVarianceCorrection && corr.record_components &&
+       !(strategy isa NoTruncation) && !_is_compilable(strategy)
+        throw(ArgumentError(
+            "variance-component recording requires a pure-drop, compilable " *
+            "truncation strategy"))
+    end
     # Fast path: filter-compilable strategies (pure-drop by construction)
     # with the built-in accumulators use the single-pass delta formula
     # instead of full before/after measurements. Everything else -- rescaling

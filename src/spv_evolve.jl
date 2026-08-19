@@ -271,6 +271,12 @@ function _boundary!(O::SparsePauliVector{N,W}, f::MergeFilter, strategy::S,
                     w::Int,
                     mask::Union{Nothing,Tuple{W,W}}=nothing) where {N,W,S<:TruncationStrategy}
     local before, n_in, n_out
+    if correction isa EnergyVarianceCorrection &&
+       correction.record_components && !compiled
+        throw(ArgumentError(
+            "variance-component recording requires a pure-drop, compilable " *
+            "truncation strategy"))
+    end
     if correction isa Union{EnergyCorrection,EnergyVarianceCorrection} && compiled
         Δ = _make_sink(correction, O)
         m = _gather_append!(O)
