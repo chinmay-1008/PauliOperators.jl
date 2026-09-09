@@ -121,9 +121,7 @@ end
         # Truncated, window=w: reference is the Dict path truncating every w
         # rotations. WeightTruncation drops on an integer criterion, so the
         # comparison is immune to FP summation-order effects near a
-        # coefficient threshold. Buffers are sized generously so no early
-        # merge fires — an early merge applies the strict filter mid-window
-        # (documented cadence difference) and would break exact parity.
+        # coefficient threshold.
         w = 5
         strat = WeightTruncation(3)
         ref = deepcopy(O0)
@@ -136,6 +134,38 @@ end
         evolve!(vw, gens, angs; window=w, truncation=strat, counters=cnt)
         @test sum(cnt.early_merges) == 0
         @test _maxdiff(ref, vw) < 1e-12
+
+        # Tight buffers force early deduplication-only merges. They must not
+        # change the requested strict-truncation cadence or its correction.
+        ψ = Ket(6, 0b010101)
+        ref_with_correction = deepcopy(O0)
+        expected_correction = EnergyCorrection(ψ)
+        for (i, (g, θ)) in enumerate(zip(gens, angs))
+            evolve!(ref_with_correction, g, θ)
+            (i % w == 0 || i == length(gens)) &&
+                truncate!(ref_with_correction, strat, expected_correction)
+        end
+        tight = SparsePauliVector(
+            O0;
+            capacity_factor=1,
+            append_factor=0.01,
+            min_capacity=4,
+        )
+        actual_correction = EnergyCorrection(ψ)
+        tight_counters = PauliOperators.WindowCounters(cld(length(gens), w))
+        evolve!(
+            tight,
+            gens,
+            angs;
+            window=w,
+            truncation=strat,
+            correction=actual_correction,
+            counters=tight_counters,
+        )
+        @test sum(tight_counters.early_merges) > 0
+        @test _maxdiff(ref_with_correction, tight) < 1e-12
+        @test actual_correction.accumulated_energy ≈
+              expected_correction.accumulated_energy atol=1e-12
 
         # local_truncation must be compilable
         v = SparsePauliVector(O0)
@@ -163,7 +193,7 @@ end
         @test sum(cnt.early_merges) > 0     # tight buffers actually forced merges
         ref = SparsePauliVector(O0)
         evolve!(ref, gens, angs; window=1)
-        @test isapprox(ref, v; atol=1e-10)  # early merges don't change the result
+        @test isapprox(ref, v; atol=1e-10)  # dedup-only merges are transparent
     end
 
     @testset "stochastic strategies (smoke, seeded)" begin

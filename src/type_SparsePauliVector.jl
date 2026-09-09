@@ -157,9 +157,10 @@ Convert a `Dict`-backed `PauliSum` into flat sorted storage.
 `capacity_factor` sizes the live buffer relative to `length(O)` (headroom
 for population growth between truncations); `append_factor` sizes the
 evolve-time append buffer relative to the live buffer. Exhaustion during
-evolution triggers an early merge and, if the population genuinely needs
-more room, chunked buffer doubling at the window boundary — never a
-hot-loop reallocation.
+evolution triggers an early deduplication-only merge and, if the population
+genuinely needs more room, chunked buffer doubling. The requested strict
+truncation cadence is unchanged by these capacity-driven merges, and buffer
+growth never occurs inside a rotation kernel.
 
 Real `T` requires (numerically) real coefficients: terms with
 `|imag(c)| > imag_tol·max(1,|c|)` are an error.

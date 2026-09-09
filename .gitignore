@@ -4,3 +4,13 @@
 /docs/build/
 .DS_Store
 Manifest.toml
+/code/
+/examples/digital_quantum_magnetism/
+/output/
+# Digital quantum magnetism generated data
+/examples/digital_quantum_magnetism/exact/**/*.jld2
+/examples/digital_quantum_magnetism/exact/**/*.tmp.*
+/examples/digital_quantum_magnetism/outputs/**/*.out
+/examples/digital_quantum_magnetism/outputs/**/*.png
+/examples/digital_quantum_magnetism/outputs/**/*.log
+/examples/digital_quantum_magnetism/outputs/**/*.pid

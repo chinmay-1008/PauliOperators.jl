@@ -113,3 +113,72 @@ function matrix_element(b::KetSum{N}, p::AnyPauliSum{N}, k::KetSum{N}) where {N}
     σ = p*k
     return inner_product(b,σ)
 end
+
+"""
+    expectation_value(p, reference::ProductDensityReference)
+
+Evaluate `tr(reference * p)` without constructing a dense density matrix.
+Only pure-`Z` Pauli strings have nonzero expectation values.
+"""
+function expectation_value(
+    p::PauliBasis{N},
+    reference::ProductDensityReference{N,T},
+) where {N,T}
+    iszero(p.x) || return zero(T)
+    return reference.magnetization ^ count_ones(p.z)
+end
+
+function expectation_value(
+    p::Pauli{N},
+    reference::ProductDensityReference{N,T},
+) where {N,T}
+    return coeff(p) * expectation_value(PauliBasis(p), reference)
+end
+
+function expectation_value(
+    O::AnyPauliSum{N,T},
+    reference::ProductDensityReference{N,R},
+) where {N,T,R}
+    S = promote_type(T, R)
+    result = zero(S)
+    for (p, c) in O
+        result += c * expectation_value(p, reference)
+    end
+    return result
+end
+
+"""
+    expectation_value(p, reference::ProductBlochReference)
+
+Evaluate a Pauli operator against a uniform product state from its local Bloch
+components. Since the reference is a product state, a Pauli-string expectation
+is the product of its one-site expectations.
+"""
+function expectation_value(
+    p::PauliBasis{N},
+    reference::ProductBlochReference{N,T},
+) where {N,T}
+    n_y = count_ones(p.z & p.x)
+    n_x = count_ones(p.x & ~p.z)
+    n_z = count_ones(p.z & ~p.x)
+    return reference.x^n_x * reference.y^n_y * reference.z^n_z
+end
+
+function expectation_value(
+    p::Pauli{N},
+    reference::ProductBlochReference{N,T},
+) where {N,T}
+    return coeff(p) * expectation_value(PauliBasis(p), reference)
+end
+
+function expectation_value(
+    O::AnyPauliSum{N,T},
+    reference::ProductBlochReference{N,R},
+) where {N,T,R}
+    S = promote_type(T, R)
+    result = zero(S)
+    for (p, c) in O
+        result += c * expectation_value(p, reference)
+    end
+    return result
+end

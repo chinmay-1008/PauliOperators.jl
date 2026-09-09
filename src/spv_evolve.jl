@@ -253,8 +253,9 @@ _needs_merged_measure(::EnergyCorrection) = false
 _needs_merged_measure(::CorrectionAccumulator) = true
 
 # Window/early boundary: measure → merge (strict filter) → generic _apply!
-# for non-compilable strategies → measure → accumulate. Corrections capture
-# exactly the truncation loss.
+# for non-compilable strategies → measure → accumulate. This is used only at
+# scheduled truncation boundaries; corrections capture exactly the truncation
+# loss.
 function _boundary!(O::SparsePauliVector{N,W}, f::MergeFilter, strategy::S,
                     compiled::Bool, correction::CorrectionAccumulator,
                     counters::Union{Nothing,WindowCounters},
@@ -283,6 +284,28 @@ function _boundary!(O::SparsePauliVector{N,W}, f::MergeFilter, strategy::S,
     return O
 end
 
+# Capacity pressure inside a window may require pending appends to be merged
+# before the scheduled strict-truncation boundary. This operation must be
+# algebraically transparent: deduplicate with NOFILTER, do not apply the
+# truncation strategy, and do not touch correction accumulators. Otherwise a
+# requested `window > 1` silently degrades toward per-rotation truncation.
+function _early_merge_only!(
+    O::SparsePauliVector{N,W},
+    counters::Union{Nothing,WindowCounters},
+    w::Int,
+    mask::Union{Nothing,Tuple{W,W}}=nothing,
+) where {N,W}
+    m = _gather_append!(O)
+    _sort_pending!(O, m, mask)
+    n_in, n_out = _merge_spv!(O, m, NOFILTER)
+    if counters !== nothing
+        counters.merge_in[w] += n_in
+        counters.merge_out[w] += n_out
+        counters.early_merges[w] += 1
+    end
+    return O
+end
+
 """
     evolve!(O::SparsePauliVector{N}, generators::Vector{PauliBasis{N}}, angles;
             window=1, truncation=NoTruncation(), local_truncation=NoTruncation(),
@@ -304,8 +327,10 @@ exactly, for every truncation strategy. `window > 1` trades truncation
 cadence for speed: deduplication and truncation happen once per window.
 
 If a rotation's worst-case appends cannot fit the append buffer, an early
-merge is triggered (harmless: it only changes truncation cadence), growing
-the buffer at the boundary if the population genuinely needs more room.
+deduplication-only merge is triggered and the buffer grows if the merged
+population genuinely needs more room. This early merge uses `NOFILTER`: the
+strict `truncation` strategy still runs only after rotations `window`,
+`2window`, ... and after the final rotation.
 The steady-state hot path allocates zero bytes — pass a `WindowCounters`
 to verify (`counters.allocd`).
 """
@@ -354,10 +379,11 @@ function evolve!(O::SparsePauliVector{N,W,T}, generators::Vector{PauliBasis{N}},
         # Worst case: every live term AND every pending append anticommutes
         # and appends one sin branch.
         if 2 * O.an + O.n > length(O.az)
-            _boundary!(O, f, truncation, compiled, correction, counters, w,
-                       since == 1 ? (lz, lx) : nothing)
-            since = 0
-            counters === nothing || (counters.early_merges[w] += 1)
+            if O.an > 0
+                _early_merge_only!(O, counters, w,
+                                   since == 1 ? (lz, lx) : nothing)
+                since = 0
+            end
             O.n > length(O.az) && _grow_append!(O, O.n)
         end
         t0 = time_ns()

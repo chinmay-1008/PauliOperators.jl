@@ -198,6 +198,40 @@ truncate!(O, strat, corr)
 println(corr.accumulated_energy)
 ```
 
+Mean-field truncation is available through the same strategy API for both
+`PauliSum` and `SparsePauliVector`:
+
+```julia
+reference = ProductBlochReference(16; theta=0.61, phi=0.37)
+mean_field = MeanFieldTruncation(3, reference)
+smfd = SingleSiteMeanFieldDecoupling(3, reference; normalize=true)
+recursive_smfd = RecursiveSingleSiteMeanFieldDecoupling(
+    3,
+    reference;
+    normalize=true,
+)
+
+v = SparsePauliVector(O; T=Float64)
+truncate!(v, mean_field)  # direct packed sparse transform
+
+# The existing windowed evolution driver invokes the same transform at each
+# boundary; no separate mean-field evolution routine is required.
+evolve!(v, generators, angles; window=1, truncation=smfd)
+
+# For windows that can create terms above max_weight + 1, repeat the same
+# normalized one-site rule until the strict cutoff is restored.
+evolve!(v, generators, angles; window=5, truncation=recursive_smfd)
+```
+
+`MeanFieldTruncation` accepts computational-basis `Ket`, general `KetSum`,
+uniform diagonal `ProductDensityReference`, and arbitrary-axis uniform
+`ProductBlochReference` references. Both one-pass and recursive SMFD accept
+`Ket`, `ProductDensityReference`, and `ProductBlochReference`, including their
+normalized forms. For a Bloch reference, `X`, `Y`, and `Z` factors are replaced
+by the corresponding local Bloch components. The sparse path emits packed
+replacement terms into the existing workspace and reuses the standard
+sort/merge collision kernels.
+
 > The exact semantics of each strategy, the weight measures they are built on, and how to define custom strategies are documented in [Truncation](https://nmayhall.github.io/PauliOperators.jl/dev/truncation/) in the docs.
 
 ## Evolution

@@ -11,6 +11,8 @@ module PauliOperators
     include("type_PauliSum.jl")
     include("type_Ket.jl")
     include("type_KetSum.jl")
+    include("type_ProductDensityReference.jl")
+    include("type_ProductBlochReference.jl")
     include("type_DyadBasis.jl")
     include("type_Dyad.jl")
     include("type_DyadSum.jl")
@@ -25,8 +27,11 @@ module PauliOperators
     include("commutator.jl")
     include("clip.jl")
     include("truncation.jl")
+    include("mean_field.jl")
+    include("single_site_mean_field.jl")
     include("evolve.jl")
     include("spv_kernels.jl")
+    include("sparse_mean_field.jl")
     include("spv_evolve.jl")
     include("spv_ops.jl")
     include("decompose.jl")
@@ -49,6 +54,8 @@ module PauliOperators
     export Dyad
     export DyadSum
     export KetSum
+    export ProductDensityReference
+    export ProductBlochReference
     export clip!  # deprecated alias for coeff_clip!
     export ⊗
     export ⊕
@@ -79,8 +86,14 @@ module PauliOperators
     export MajoranaWeightTruncation, WeightDampedTruncation, CompositeTruncation
     export StochasticCoeffTruncation, StochasticSamplingTruncation
     export AdaptiveTruncation
+    export MeanFieldTruncation, SingleSiteMeanFieldDecoupling
+    export RecursiveSingleSiteMeanFieldDecoupling
     export NoCorrection, EnergyCorrection, EnergyVarianceCorrection
     export truncate!
+    export mean_field_factorize, mean_field_factorize!
+    export single_site_mean_field_decouple, single_site_mean_field_decouple!
+    export recursive_single_site_mean_field_decouple
+    export recursive_single_site_mean_field_decouple!
 
     # Decomposition
     export trotterize, qdrift

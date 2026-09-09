@@ -141,6 +141,268 @@ end
 AdaptiveTruncation(; max_terms::Int=10000, min_thresh::Float64=1e-12) = AdaptiveTruncation(max_terms, min_thresh)
 
 """
+    MeanFieldTruncation(
+        max_weight::Int,
+        reference::Union{
+            Ket{N},
+            KetSum{N},
+            ProductDensityReference{N},
+            ProductBlochReference{N},
+        },
+    )
+
+Replace each Pauli term with weight > `max_weight` by its order-`max_weight`
+mean-field factorization around `reference`.
+
+Unlike `WeightTruncation`, which discards high-weight terms, this strategy
+expands each high-weight string in single-site fluctuations
+`δP_i = P_i − ⟨P_i⟩ I` and keeps the lower-weight pieces. For computational-basis
+`Ket` references, the optimized factorization preserves
+`⟨reference|O|reference⟩` at every truncation order. For `KetSum` references,
+the strategy uses local single-site expectations and is a mean-field
+approximation for entangled states.
+"""
+struct MeanFieldTruncation{N,R} <: TruncationStrategy
+    max_weight::Int
+    reference::R
+end
+
+MeanFieldTruncation(max_weight::Int, reference::Ket{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+MeanFieldTruncation(max_weight::Int, reference::KetSum{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+MeanFieldTruncation(max_weight::Int, reference::ProductDensityReference{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+MeanFieldTruncation(max_weight::Int, reference::ProductBlochReference{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+MeanFieldTruncation{N}(max_weight::Int, reference::Ket{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+MeanFieldTruncation{N}(max_weight::Int, reference::KetSum{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+MeanFieldTruncation{N}(max_weight::Int, reference::ProductDensityReference{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+MeanFieldTruncation{N}(max_weight::Int, reference::ProductBlochReference{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+
+"""
+    SingleSiteMeanFieldDecoupling(
+        max_weight::Int,
+        reference::Union{
+            Ket{N},
+            ProductDensityReference{N},
+            ProductBlochReference{N},
+        },
+        normalize::Bool=false,
+    )
+
+For each Pauli term with weight greater than `max_weight`, replace one
+nonidentity factor at a time by its local expectation value and sum the
+results. This is the sparse single-site mean-field decoupling (SMFD) rule
+
+```math
+\\mathcal M(P_S) =
+\\sum_{j \\in S} \\langle P_j \\rangle_{\\mathrm{reference}}
+I_j \\prod_{i \\in S \\setminus \\{j\\}} P_i.
+```
+
+SMFD lowers each selected term by one site per application. It therefore
+enforces the requested weight bound when the input weight is at most
+`max_weight + 1`, as in bounded evolution under one- and two-site generators.
+Raw SMFD does not generally preserve the reference expectation value. Set
+`normalize=true` to divide each replacement by the number of contributing
+sites. For a product reference, this normalized rule preserves the reference
+expectation of every input term and removes SMFD's combinatorial overcounting.
+"""
+struct SingleSiteMeanFieldDecoupling{N,R} <: TruncationStrategy
+    max_weight::Int
+    reference::R
+    normalize::Bool
+end
+
+SingleSiteMeanFieldDecoupling(
+    max_weight::Int,
+    reference::Ket{N};
+    normalize::Bool=false,
+) where N =
+    SingleSiteMeanFieldDecoupling{N,typeof(reference)}(
+        max_weight,
+        reference,
+        normalize,
+    )
+SingleSiteMeanFieldDecoupling(
+    max_weight::Int,
+    reference::ProductDensityReference{N},
+    ;
+    normalize::Bool=false,
+) where N =
+    SingleSiteMeanFieldDecoupling{N,typeof(reference)}(
+        max_weight,
+        reference,
+        normalize,
+    )
+SingleSiteMeanFieldDecoupling(
+    max_weight::Int,
+    reference::ProductBlochReference{N},
+    ;
+    normalize::Bool=false,
+) where N =
+    SingleSiteMeanFieldDecoupling{N,typeof(reference)}(
+        max_weight,
+        reference,
+        normalize,
+    )
+SingleSiteMeanFieldDecoupling(
+    max_weight::Int,
+    reference::Union{
+        Ket{N},
+        ProductDensityReference{N},
+        ProductBlochReference{N},
+    },
+    normalize::Bool,
+) where N =
+    SingleSiteMeanFieldDecoupling(max_weight, reference; normalize=normalize)
+SingleSiteMeanFieldDecoupling{N}(
+    max_weight::Int,
+    reference::Ket{N},
+    ;
+    normalize::Bool=false,
+) where N =
+    SingleSiteMeanFieldDecoupling{N,typeof(reference)}(
+        max_weight,
+        reference,
+        normalize,
+    )
+SingleSiteMeanFieldDecoupling{N}(
+    max_weight::Int,
+    reference::ProductDensityReference{N},
+    ;
+    normalize::Bool=false,
+) where N =
+    SingleSiteMeanFieldDecoupling{N,typeof(reference)}(
+        max_weight,
+        reference,
+        normalize,
+    )
+SingleSiteMeanFieldDecoupling{N}(
+    max_weight::Int,
+    reference::ProductBlochReference{N},
+    ;
+    normalize::Bool=false,
+) where N =
+    SingleSiteMeanFieldDecoupling{N,typeof(reference)}(
+        max_weight,
+        reference,
+        normalize,
+    )
+SingleSiteMeanFieldDecoupling{N}(
+    max_weight::Int,
+    reference::Union{
+        Ket{N},
+        ProductDensityReference{N},
+        ProductBlochReference{N},
+    },
+    normalize::Bool,
+) where N =
+    SingleSiteMeanFieldDecoupling{N}(
+        max_weight,
+        reference;
+        normalize=normalize,
+    )
+
+"""
+    RecursiveSingleSiteMeanFieldDecoupling(
+        max_weight::Int,
+        reference::Union{
+            Ket{N},
+            ProductDensityReference{N},
+            ProductBlochReference{N},
+        };
+        normalize::Bool=false,
+    )
+
+Strict-weight variant of [`SingleSiteMeanFieldDecoupling`](@ref). It applies
+the same one-site rule repeatedly until every surviving term has weight at
+most `max_weight`. Thus an input at `max_weight + 1` behaves exactly like the
+original strategy, while an input at `max_weight + r` receives `r` layers and
+ends at the cutoff.
+
+Set `normalize=true` to normalize every layer by its number of contributing
+sites. For product references this preserves the reference expectation at
+each layer and avoids multiplicity from different site-removal orders.
+"""
+struct RecursiveSingleSiteMeanFieldDecoupling{N,R} <: TruncationStrategy
+    max_weight::Int
+    reference::R
+    normalize::Bool
+end
+
+function RecursiveSingleSiteMeanFieldDecoupling(
+    max_weight::Int,
+    reference::Union{
+        Ket{N},
+        ProductDensityReference{N},
+        ProductBlochReference{N},
+    },
+    ;
+    normalize::Bool=false,
+) where N
+    max_weight >= 0 || throw(ArgumentError("max_weight must be nonnegative"))
+    return RecursiveSingleSiteMeanFieldDecoupling{N,typeof(reference)}(
+        max_weight,
+        reference,
+        normalize,
+    )
+end
+
+RecursiveSingleSiteMeanFieldDecoupling(
+    max_weight::Int,
+    reference::Union{
+        Ket{N},
+        ProductDensityReference{N},
+        ProductBlochReference{N},
+    },
+    normalize::Bool,
+) where N =
+    RecursiveSingleSiteMeanFieldDecoupling(
+        max_weight,
+        reference;
+        normalize=normalize,
+    )
+
+function RecursiveSingleSiteMeanFieldDecoupling{N}(
+    max_weight::Int,
+    reference::Union{
+        Ket{N},
+        ProductDensityReference{N},
+        ProductBlochReference{N},
+    },
+    ;
+    normalize::Bool=false,
+) where N
+    max_weight >= 0 || throw(ArgumentError("max_weight must be nonnegative"))
+    return RecursiveSingleSiteMeanFieldDecoupling{N,typeof(reference)}(
+        max_weight,
+        reference,
+        normalize,
+    )
+end
+
+RecursiveSingleSiteMeanFieldDecoupling{N}(
+    max_weight::Int,
+    reference::Union{
+        Ket{N},
+        ProductDensityReference{N},
+        ProductBlochReference{N},
+    },
+    normalize::Bool,
+) where N =
+    RecursiveSingleSiteMeanFieldDecoupling{N}(
+        max_weight,
+        reference;
+        normalize=normalize,
+    )
+
+"""
     CompositeTruncation(strategies...)
 
 Apply multiple truncation strategies in sequence.
@@ -240,6 +502,34 @@ end
 function _apply!(O::PauliSum{N}, s::CompositeTruncation) where N
     _apply_tup!(O, s.strategies)
     return O
+end
+
+function _apply!(O::PauliSum{N,T}, s::MeanFieldTruncation{N}) where {N,T}
+    return mean_field_factorize!(O, s.reference, s.max_weight)
+end
+
+function _apply!(
+    O::PauliSum{N,T},
+    s::SingleSiteMeanFieldDecoupling{N},
+) where {N,T}
+    return single_site_mean_field_decouple!(
+        O,
+        s.reference,
+        s.max_weight;
+        normalize=s.normalize,
+    )
+end
+
+function _apply!(
+    O::PauliSum{N,T},
+    s::RecursiveSingleSiteMeanFieldDecoupling{N},
+) where {N,T}
+    return recursive_single_site_mean_field_decouple!(
+        O,
+        s.reference,
+        s.max_weight;
+        normalize=s.normalize,
+    )
 end
 
 
