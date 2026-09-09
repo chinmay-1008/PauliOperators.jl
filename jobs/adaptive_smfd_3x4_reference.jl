@@ -2,16 +2,18 @@
 # Adaptive SMFD Cartesian reference on the 3 x 4 periodic transverse-field
 # Ising torus, packaged as a batch job.
 #
-# Submit from inside this directory, with a bare filename, because the wrapper
-# copies $INFILE into $TMPDIR and runs it from there:
+# Submit from whatever directory holds this file, next to the submit script:
 #
-#     cd jobs
-#     sbatch ../slurm.sh adaptive_smfd_3x4_reference.jl
+#     sbatch submit.sh adaptive_smfd_3x4_reference.jl
 #
-# The environment must be instantiated once first, since Manifest.toml is not in
-# the repository:
+# The file does not need to live inside the package clone. The environment comes
+# from $JULIAENV, which the submit script exports and which must already be
+# instantiated; Manifest.toml is not in the repository. Pass a bare filename:
+# the wrapper copies $INFILE into $TMPDIR and runs it from there, so a
+# path-qualified argument would not resolve.
 #
-#     julia --project=$JULIAENV -e 'using Pkg; Pkg.instantiate()'
+# Results are written under the directory you submit from, not $TMPDIR, so they
+# survive a walltime kill.
 #
 # SMFD is the only mean-field variant here. Every reference-dependent trajectory
 # is propagated with
