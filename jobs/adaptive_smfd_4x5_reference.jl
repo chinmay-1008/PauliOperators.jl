@@ -2,7 +2,16 @@
 # Adaptive SMFD Cartesian reference on the 4 x 5 periodic transverse-field
 # Ising torus, packaged as a batch job.
 #
-#     sbatch slurm.sh jobs/adaptive_smfd_4x5_reference.jl
+# Submit from inside this directory, with a bare filename, because the wrapper
+# copies $INFILE into $TMPDIR and runs it from there:
+#
+#     cd jobs
+#     sbatch ../slurm.sh adaptive_smfd_4x5_reference.jl
+#
+# The environment must be instantiated once first, since Manifest.toml is not in
+# the repository:
+#
+#     julia --project=$JULIAENV -e 'using Pkg; Pkg.instantiate()'
 #
 # SMFD is the only mean-field variant here. Every reference-dependent trajectory
 # is propagated with
@@ -28,21 +37,27 @@
 
 using Pkg
 
-project_root = normpath(joinpath(@__DIR__, ".."))
+announce(message) = (println(message); flush(stdout))
 
-if !isfile(joinpath(project_root, "Project.toml"))
-    project_root = pwd()
+# Prefer an explicitly exported environment (the SLURM wrapper sets JULIAENV),
+# then the repository this file sits in. If neither holds a Project.toml the
+# file has been copied somewhere else to run, so leave the environment that
+# julia --project= already established rather than clobbering it.
+project_root = get(ENV, "JULIAENV", normpath(joinpath(@__DIR__, "..")))
+
+if isfile(joinpath(project_root, "Project.toml"))
+    Pkg.activate(project_root)
+else
+    @warn "no Project.toml found; keeping the active project" project_root Base.active_project()
 end
 
-Pkg.activate(project_root)
+announce("active project = $(Base.active_project())")
 
 using JLD2
 using LinearAlgebra
 using PauliOperators
 using Printf
 using Statistics
-
-announce(message) = (println(message); flush(stdout))
 
 # -----------------------------------------------------------------------------
 # 1. Protocol
@@ -148,8 +163,11 @@ announce("digital steps = $(n_steps), dt = $(dt)")
 )
 flush(stdout)
 
-results_file = normpath(joinpath(@__DIR__, "results", "adaptive_smfd_4x5_reference.jld2"))
+results_root = get(ENV, "SMFD_RESULTS_DIR", get(ENV, "SLURM_SUBMIT_DIR", @__DIR__))
+results_file = normpath(joinpath(results_root, "results", "adaptive_smfd_4x5_reference.jld2"))
 mkpath(dirname(results_file))
+
+announce("results root = $(results_root)")
 
 saved = Dict{String,Any}(
     "parameters" => (
@@ -644,7 +662,7 @@ notebook_3x4_vy = [-0.2, 0.4, -0.8, -0.6, 0.0, 0.8, 0.0, 0.4, -0.4, 0.0, 0.6, 0.
 notebook_3x4_vz = [-0.4, -0.2, 0.0, 0.4, 0.0, 0.0, -1.0, 0.0, -0.6, -0.4, 0.0, 0.0, 0.0, -0.8, 0.0, 0.0, 0.0, 0.0, -0.8, 0.0]
 
 schedule_file = normpath(joinpath(
-    @__DIR__,
+    results_root,
     "results",
     "adaptive_smfd_3x4_reference.jld2",
 ))
