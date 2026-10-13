@@ -168,7 +168,7 @@ end
 single_site_mean_field_decouple(
     pb::PauliBasis{N},
     c,
-    reference::ProductBlochReference{N},
+    reference::Union{ProductBlochReference{N},SiteBlochReference{N}},
     normalize::Bool,
 ) where N =
     single_site_mean_field_decouple(
@@ -177,6 +177,52 @@ single_site_mean_field_decouple(
         reference;
         normalize=normalize,
     )
+
+
+"""
+    single_site_mean_field_decouple(
+        pb::PauliBasis{N}, c, reference::SiteBlochReference{N};
+        normalize=false
+    ) -> PauliSum
+
+SMFD around a per-site product-Bloch reference: the factor on site `q` is
+replaced by `reference.x[q]`, `reference.y[q]`, or `reference.z[q]`. Otherwise
+identical to the uniform [`ProductBlochReference`](@ref) rule, including the
+normalized variant, which preserves the reference expectation of every input
+term.
+"""
+function single_site_mean_field_decouple(
+    pb::PauliBasis{N},
+    c::T,
+    reference::SiteBlochReference{N,S},
+    ;
+    normalize::Bool=false,
+) where {N,T,S}
+    support = pb.z | pb.x
+    n_contributing = 0
+    for q in get_on_bits(support)
+        mask = _bitmask(q)
+        local_mean = _site_bloch_mean(reference, q, !iszero(pb.z & mask), !iszero(pb.x & mask))
+        n_contributing += !iszero(local_mean)
+    end
+
+    R0 = promote_type(T, S)
+    R = normalize && n_contributing > 0 ?
+        typeof(R0(c) / n_contributing) : R0
+    result = PauliSum(N, R)
+    iszero(n_contributing) && return result
+    scale = normalize ? inv(R(n_contributing)) : one(R)
+
+    for q in get_on_bits(support)
+        mask = _bitmask(q)
+        local_mean = R(_site_bloch_mean(reference, q, !iszero(pb.z & mask), !iszero(pb.x & mask)))
+        iszero(local_mean) && continue
+        pb_new = PauliBasis{N}(pb.z & ~mask, pb.x & ~mask)
+        _add_term!(result, pb_new, R(c) * local_mean * scale)
+    end
+
+    return result
+end
 
 
 """
@@ -255,7 +301,7 @@ end
 
 function single_site_mean_field_decouple!(
     O::PauliSum{N,T},
-    reference::ProductBlochReference{N},
+    reference::Union{ProductBlochReference{N},SiteBlochReference{N}},
     max_weight::Int,
     ;
     normalize::Bool=false,
@@ -286,6 +332,7 @@ single_site_mean_field_decouple!(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     max_weight::Int,
     normalize::Bool,
@@ -324,6 +371,7 @@ function recursive_single_site_mean_field_decouple(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     max_weight::Int,
     ;
@@ -357,6 +405,7 @@ recursive_single_site_mean_field_decouple(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     max_weight::Int,
     normalize::Bool,
@@ -386,6 +435,7 @@ function recursive_single_site_mean_field_decouple!(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     max_weight::Int,
     ;
@@ -409,6 +459,7 @@ recursive_single_site_mean_field_decouple!(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     max_weight::Int,
     normalize::Bool,

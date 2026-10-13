@@ -250,17 +250,23 @@ end
            reference.x
 end
 
-"""
-    mean_field_factorize(pb, c, reference::ProductBlochReference, k)
+@inline _product_bloch_mean(pb::PauliBasis, q::Int, reference::SiteBlochReference) =
+    _site_bloch_mean(reference, q, !iszero(pb.z & _bitmask(q)), !iszero(pb.x & _bitmask(q)))
 
-Order-`k` mean-field factorization around a uniform product reference with
-arbitrary local Bloch vector. Unlike `ProductDensityReference`, all three local
-Pauli means can contribute.
+"""
+    mean_field_factorize(pb, c, reference::Union{ProductBlochReference,SiteBlochReference}, k)
+
+Order-`k` mean-field factorization around a product reference with arbitrary
+local Bloch vectors: the same vector on every site (`ProductBlochReference`) or
+one per site (`SiteBlochReference`). Unlike `ProductDensityReference`, all three
+local Pauli means can contribute. The expansion keeps, for each retained subset
+`G` of the string's support, the product of the means outside `G` times the
+partial alternating binomial; that identity holds for site-dependent means too.
 """
 function mean_field_factorize(
     pb::PauliBasis{N},
     c::T,
-    reference::ProductBlochReference{N,S},
+    reference::Union{ProductBlochReference{N,S},SiteBlochReference{N,S}},
     k::Int,
 ) where {N,T,S}
     R = promote_type(T, S)
@@ -346,7 +352,7 @@ end
 
 function mean_field_factorize!(
     O::PauliSum{N,T},
-    reference::ProductBlochReference{N},
+    reference::Union{ProductBlochReference{N},SiteBlochReference{N}},
     k::Int,
 ) where {N,T}
     high = [pb for (pb, _) in O if weight(pb) > k]

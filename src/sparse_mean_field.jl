@@ -221,6 +221,20 @@ end
            reference.x
 end
 
+# Per-site product-Bloch reference: the site index is the position of `bit`.
+@inline _packed_bloch_mean(
+    z::W,
+    x::W,
+    bit::W,
+    reference::SiteBlochReference,
+) where {W<:Unsigned} =
+    _site_bloch_mean(
+        reference,
+        trailing_zeros(bit) + 1,
+        !iszero(z & bit),
+        !iszero(x & bit),
+    )
+
 function _emit_bloch_combinations!(
     v::SparsePauliVector{N,W,T},
     m::Int,
@@ -232,7 +246,7 @@ function _emit_bloch_combinations!(
     x::W,
     c::T,
     factor::Int,
-    reference::ProductBlochReference{N},
+    reference::Union{ProductBlochReference{N},SiteBlochReference{N}},
 ) where {N,W,T}
     if choose == 0
         mean_rest = one(T)
@@ -280,7 +294,7 @@ function _emit_mean_field_term!(
     z::W,
     x::W,
     c::T,
-    reference::ProductBlochReference{N},
+    reference::Union{ProductBlochReference{N},SiteBlochReference{N}},
     k::Int,
 ) where {N,W,T}
     support = z | x
@@ -495,6 +509,7 @@ function mean_field_factorize!(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     k::Int,
 ) where {N,W,T}
@@ -618,7 +633,7 @@ function _emit_smfd_term!(
     z::W,
     x::W,
     c::T,
-    reference::ProductBlochReference{N},
+    reference::Union{ProductBlochReference{N},SiteBlochReference{N}},
     normalize::Bool,
 ) where {N,W,T}
     support = z | x
@@ -658,6 +673,7 @@ function single_site_mean_field_decouple!(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     max_weight::Int;
     normalize::Bool=false,
@@ -694,6 +710,7 @@ single_site_mean_field_decouple!(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     max_weight::Int,
     normalize::Bool,
@@ -720,6 +737,7 @@ function recursive_single_site_mean_field_decouple!(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     max_weight::Int,
     ;
@@ -744,6 +762,7 @@ recursive_single_site_mean_field_decouple!(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     max_weight::Int,
     normalize::Bool,

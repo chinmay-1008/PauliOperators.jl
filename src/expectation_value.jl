@@ -171,9 +171,34 @@ function expectation_value(
     return coeff(p) * expectation_value(PauliBasis(p), reference)
 end
 
+"""
+    expectation_value(p, reference::SiteBlochReference)
+
+Product of the per-site Bloch components of the reference over the support of
+the Pauli string.
+"""
+function expectation_value(
+    p::PauliBasis{N},
+    reference::SiteBlochReference{N,T},
+) where {N,T}
+    result = one(T)
+    for q in get_on_bits(p.z | p.x)
+        mask = _bitmask(q)
+        result *= _site_bloch_mean(reference, q, !iszero(p.z & mask), !iszero(p.x & mask))
+    end
+    return result
+end
+
+function expectation_value(
+    p::Pauli{N},
+    reference::SiteBlochReference{N,T},
+) where {N,T}
+    return coeff(p) * expectation_value(PauliBasis(p), reference)
+end
+
 function expectation_value(
     O::AnyPauliSum{N,T},
-    reference::ProductBlochReference{N,R},
+    reference::Union{ProductBlochReference{N,R},SiteBlochReference{N,R}},
 ) where {N,T,R}
     S = promote_type(T, R)
     result = zero(S)

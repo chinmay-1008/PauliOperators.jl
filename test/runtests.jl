@@ -20,6 +20,7 @@ using Test
     include("test_mean_field.jl")
     include("test_product_density_reference.jl")
     include("test_product_bloch_reference.jl")
+    include("test_site_bloch_reference.jl")
     include("test_digital_quantum_magnetism.jl")
     include("test_single_site_mean_field.jl")
     include("test_vectorized_mean_field.jl")

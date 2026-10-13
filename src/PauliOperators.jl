@@ -13,6 +13,7 @@ module PauliOperators
     include("type_KetSum.jl")
     include("type_ProductDensityReference.jl")
     include("type_ProductBlochReference.jl")
+    include("type_SiteBlochReference.jl")
     include("type_DyadBasis.jl")
     include("type_Dyad.jl")
     include("type_DyadSum.jl")
@@ -56,6 +57,7 @@ module PauliOperators
     export KetSum
     export ProductDensityReference
     export ProductBlochReference
+    export SiteBlochReference
     export clip!  # deprecated alias for coeff_clip!
     export ⊗
     export ⊕

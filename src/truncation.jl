@@ -148,11 +148,13 @@ AdaptiveTruncation(; max_terms::Int=10000, min_thresh::Float64=1e-12) = Adaptive
             KetSum{N},
             ProductDensityReference{N},
             ProductBlochReference{N},
+            SiteBlochReference{N},
         },
     )
 
 Replace each Pauli term with weight > `max_weight` by its order-`max_weight`
-mean-field factorization around `reference`.
+mean-field factorization around `reference`. A `SiteBlochReference` uses each
+site's own Bloch vector for the local means.
 
 Unlike `WeightTruncation`, which discards high-weight terms, this strategy
 expands each high-weight string in single-site fluctuations
@@ -182,6 +184,10 @@ MeanFieldTruncation{N}(max_weight::Int, reference::KetSum{N}) where N =
 MeanFieldTruncation{N}(max_weight::Int, reference::ProductDensityReference{N}) where N =
     MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
 MeanFieldTruncation{N}(max_weight::Int, reference::ProductBlochReference{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+MeanFieldTruncation(max_weight::Int, reference::SiteBlochReference{N}) where N =
+    MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
+MeanFieldTruncation{N}(max_weight::Int, reference::SiteBlochReference{N}) where N =
     MeanFieldTruncation{N,typeof(reference)}(max_weight, reference)
 
 """
@@ -253,10 +259,22 @@ SingleSiteMeanFieldDecoupling(
     )
 SingleSiteMeanFieldDecoupling(
     max_weight::Int,
+    reference::SiteBlochReference{N},
+    ;
+    normalize::Bool=false,
+) where N =
+    SingleSiteMeanFieldDecoupling{N,typeof(reference)}(
+        max_weight,
+        reference,
+        normalize,
+    )
+SingleSiteMeanFieldDecoupling(
+    max_weight::Int,
     reference::Union{
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     normalize::Bool,
 ) where N =
@@ -296,10 +314,22 @@ SingleSiteMeanFieldDecoupling{N}(
     )
 SingleSiteMeanFieldDecoupling{N}(
     max_weight::Int,
+    reference::SiteBlochReference{N},
+    ;
+    normalize::Bool=false,
+) where N =
+    SingleSiteMeanFieldDecoupling{N,typeof(reference)}(
+        max_weight,
+        reference,
+        normalize,
+    )
+SingleSiteMeanFieldDecoupling{N}(
+    max_weight::Int,
     reference::Union{
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     normalize::Bool,
 ) where N =
@@ -342,6 +372,7 @@ function RecursiveSingleSiteMeanFieldDecoupling(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     ;
     normalize::Bool=false,
@@ -360,6 +391,7 @@ RecursiveSingleSiteMeanFieldDecoupling(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     normalize::Bool,
 ) where N =
@@ -375,6 +407,7 @@ function RecursiveSingleSiteMeanFieldDecoupling{N}(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     ;
     normalize::Bool=false,
@@ -393,6 +426,7 @@ RecursiveSingleSiteMeanFieldDecoupling{N}(
         Ket{N},
         ProductDensityReference{N},
         ProductBlochReference{N},
+        SiteBlochReference{N},
     },
     normalize::Bool,
 ) where N =
