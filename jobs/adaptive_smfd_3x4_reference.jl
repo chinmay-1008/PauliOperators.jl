@@ -26,11 +26,11 @@
 # No RMFD, product-density, or low-weight variant is computed. Hard weight
 # truncation is carried as the no-reference baseline, as in the notebooks.
 #
-# The protocol matches adaptive_smfd_3x4_bloch_vector_reference.ipynb: same
-# couplings, digital sequence, observable, thresholds, physical state, and the
-# same 516-candidate Bloch-ball grid. The static 516-trajectory bank, the
-# time-slice diagnostic, and every plot are dropped; only the adaptive
-# (vx, vy, vz) dynamics are computed here.
+# The protocol matches adaptive_smfd_3x4_bloch_vector_reference.ipynb: same couplings, digital sequence,
+# observable, thresholds, physical state, and the same reference grid
+# (516 points of the Bloch ball, norm <= 1, mostly mixed). The static reference bank, the time-slice diagnostic, and
+# every plot are dropped; only the adaptive (vx, vy, vz) dynamics are computed
+# here.
 #
 # Nothing is plotted. Everything the plots need is written to
 #     results/adaptive_smfd_3x4_reference.jld2
@@ -433,7 +433,7 @@ saved["krylov_residual"] = krylov_residual
 checkpoint!()
 
 # -----------------------------------------------------------------------------
-# 3. Candidate references and the SMFD propagator
+# 3. Candidate references (Bloch ball) and the SMFD propagator
 # -----------------------------------------------------------------------------
 
 function cartesian_bloch_candidates(N, component_values, physical_vector)

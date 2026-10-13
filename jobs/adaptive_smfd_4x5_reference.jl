@@ -26,11 +26,11 @@
 # No RMFD, product-density, or low-weight variant is computed. Hard weight
 # truncation is carried as the no-reference baseline, as in the notebooks.
 #
-# The protocol matches adaptive_smfd_3x4_bloch_vector_reference.ipynb: same
-# couplings, digital sequence, observable, thresholds, physical state, and the
-# same 516-candidate Bloch-ball grid. The static 516-trajectory bank, the
-# time-slice diagnostic, and every plot are dropped; only the adaptive
-# (vx, vy, vz) dynamics are computed here.
+# The protocol matches adaptive_smfd_3x4_bloch_vector_reference.ipynb: same couplings, digital sequence,
+# observable, thresholds, physical state, and the same reference grid
+# (516 points of the Bloch ball, norm <= 1, mostly mixed). The static reference bank, the time-slice diagnostic, and
+# every plot are dropped; only the adaptive (vx, vy, vz) dynamics are computed
+# here.
 #
 # Nothing is plotted. Everything the plots need is written to
 #     results/adaptive_smfd_4x5_reference.jld2
@@ -382,7 +382,7 @@ saved["krylov_residual"] = krylov_residual
 checkpoint!()
 
 # -----------------------------------------------------------------------------
-# 3. Candidate references and the SMFD propagator
+# 3. Candidate references (Bloch ball) and the SMFD propagator
 # -----------------------------------------------------------------------------
 
 function cartesian_bloch_candidates(N, component_values, physical_vector)
@@ -697,8 +697,20 @@ end
 @assert length(transfer_vy) == n_steps
 @assert length(transfer_vz) == n_steps
 
+for step in 1:n_steps
+    squared = transfer_vx[step]^2 + transfer_vy[step]^2 + transfer_vz[step]^2
+
+    while squared > 1
+        shrink = 1 - eps(Float64)
+        transfer_vx[step] *= shrink
+        transfer_vy[step] *= shrink
+        transfer_vz[step] *= shrink
+        squared = transfer_vx[step]^2 + transfer_vy[step]^2 + transfer_vz[step]^2
+    end
+end
+
 transfer_norm = sqrt.(transfer_vx .^ 2 .+ transfer_vy .^ 2 .+ transfer_vz .^ 2)
-@assert maximum(transfer_norm) <= 1 + 1e-12
+@assert maximum(transfer_norm) <= 1
 
 transfer_strategies = [
     smfd_strategy(
